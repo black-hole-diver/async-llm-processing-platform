@@ -1,0 +1,97 @@
+services:
+  rabbitmq:
+    restart: always
+    networks:
+      - rabbitmq-net
+    image: rabbitmq:4.3.6-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "15672:15672" # management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  model-runner-service:
+    restart: unless-stopped
+    networks:
+      - rabbitmq-net
+    build: ./model_runner_service
+    container_name: model-runner-service
+    env_file: .env
+    ports:
+      - "5004:5004"
+
+  # Uncomment on Task One
+  llm-service:
+    restart: always
+    networks:
+      - rabbitmq-net
+    build: ./llm_service
+    container_name: llm-service
+    env_file: .env
+    volumes:
+      - llm-data:/data
+    ports:
+      - "5002:5002"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # Uncomment on Task Two
+  # user-service:
+  #   restart: always
+  #   networks:
+  #     - rabbitmq-net
+  #   build: ./user_service
+  #   container_name: user-service
+  #   env_file: .env
+  #   volumes:
+  #     - user-data:/data
+  #   ports:
+  #     - "5001:5001"
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+
+  # Uncomment on Task Three
+  # query-service:
+  #   restart: always
+  #   networks:
+  #     - rabbitmq-net
+  #   build: ./query_service
+  #   container_name: query-service
+  #   env_file: .env
+  #   volumes:
+  #     - query-data:/data
+  #   ports:
+  #     - "5003:5003"
+  #   depends_on:
+  #     - rabbitmq
+  #     - user-service
+  #     - llm-service
+
+  # Uncomment on Task Four
+  # worker-service:
+  #   restart: always
+  #   networks:
+  #     - rabbitmq-net
+  #   build: ./worker_service
+  #   container_name: worker-service
+  #   env_file: .env
+  #   volumes:
+  #     - query-data:/data
+  #   depends_on:
+  #     - rabbitmq
+  #     - user-service
+  #     - llm-service
+  #     - model-runner-service
+
+networks:
+  rabbitmq-net:
+
+volumes:
+  user-data:
+  llm-data:
+  query-data:
