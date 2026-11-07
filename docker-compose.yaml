@@ -23,7 +23,6 @@ services:
     ports:
       - "5004:5004"
 
-  # Uncomment on Task One
   llm-service:
     restart: always
     networks:
@@ -39,21 +38,20 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Uncomment on Task Two
-  # user-service:
-  #   restart: always
-  #   networks:
-  #     - rabbitmq-net
-  #   build: ./user_service
-  #   container_name: user-service
-  #   env_file: .env
-  #   volumes:
-  #     - user-data:/data
-  #   ports:
-  #     - "5001:5001"
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
+  user-service:
+    restart: always
+    networks:
+      - rabbitmq-net
+    build: ./user_service
+    container_name: user-service
+    env_file: .env
+    volumes:
+      - user-data:/data
+    ports:
+      - "5001:5001"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   # Uncomment on Task Three
   # query-service:

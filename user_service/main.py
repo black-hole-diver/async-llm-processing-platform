@@ -68,5 +68,18 @@ def add_credits(user_id: int, body: AmountBody):
 
 @app.post("/user/{user_id}/deduct_credits")
 def deduct_credits(user_id: int, body: AmountBody):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    if body.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    with sqlite3.connect(USER_DB) as c:
+        user = c.execute(
+            "SELECT credits FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        current_credits = user[0]
+        if current_credits < body.amount:
+            raise HTTPException(status_code=400, detail="Insufficient credits")
+        new_credits = current_credits - body.amount
+        c.execute("UPDATE users SET credits = ? WHERE id = ?", (new_credits, user_id))
+        c.commit()
+    return {"status": "ok", "credits": new_credits}
