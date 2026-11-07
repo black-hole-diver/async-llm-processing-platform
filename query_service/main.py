@@ -94,15 +94,76 @@ def deduct_user_credits(user_id, amount):
         raise HTTPException(status_code=502, detail=f"User service unreachable: {e}")
 
 def insert_query(q: QueryRequest):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    qid = str(uuid.uuid4())
+    with sqlite3.connect(QUERY_DB) as c:
+        c.execute("INSERT INTO queries (id, user_id, llm_shortname, prompt, status) VALUES (?, ?, ?, ?, ?)",
+            (qid, q.user_id, q.model, q.prompt, "queued"))
+        c.commit()
+    return qid
 
 @app.post("/query")
 def submit_query(q: QueryRequest):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    model_info = get_llm_info(q.model)
+    cost = model_info["cost"]
+    deduct_user_credits(q.user_id, cost)
+    qid = None
+    try:
+        qid = insert_query(q)
+        publish_message({
+            "id": qid,
+            "user_id": q.user_id,
+            "model": q.model,
+            "prompt": q.prompt
+        })
+    except Exception as e:
+        if qid is not None:
+            try:
+                with sqlite3.connect(QUERY_DB) as c:
+                    c.execute(
+                        "UPDATE queries SET status = ?, error = ?, WHERE id = ?",
+                        ("failed", str(e), qid)
+                    )
+                c.commit()
+            except sqlite3.Error as e:
+                print(f"Query submission failed and could not update status in DB: {e}", flush=True)
+        try:
+            refund = requests.post(
+                f"{USER_SERVICE_URL}/user/{q.user_id}/add_credits",
+                json={"amount": cost},
+                timeout=5
+            )
+            refund.raise_for_status()
+        except Exception as e2:
+            raise HTTPException(
+                status_code = 503,
+                detail=f"Submission failed and refund failed: {e2}"
+            ) from e2
+        raise HTTPException(
+            status_code = 503,
+            detail=f"Submission failed and credit refunded failed: {e}"
+        ) from e
+    return {
+        "query_id": qid,
+        "status": "queued",
+        "llm_cost": cost
+    }
+
 
 @app.get("/query/{qid}")
 def get_query(qid: str):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    with sqlite3.connect(QUERY_DB) as c:
+        row = c.execute(
+            "SELECT id, user_id, llm_shortname, prompt, response, status, error FROM queries WHERE id = ?",
+            (qid,)
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Query not found")
+    return {
+        "id": row[0],
+        "user_id": row[1],
+        "llm_shortname": row[2],
+        "prompt": row[3],
+        "response": row[4],
+        "status": row[5],
+        "error": row[6]
+    }
