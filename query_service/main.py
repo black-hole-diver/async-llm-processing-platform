@@ -51,17 +51,38 @@ def init_db():
         c.commit()
 
 def setup_rabbitmq_producer():
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    global conn, ch
+    conn = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    ch = conn.channel()
+    ch.queue_declare(queue=QUEUE, durable=True)
+    ch.confirm_delivery()
 
 def publish_message(msg):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
+    global ch, conn
+    try:
+        if conn is None or conn.is_closed or ch is None or ch.is_closed:
+            setup_rabbitmq_producer()
+        ch.basic_publish(
+            exchange='',
+            routing_key=QUEUE,
+            body=json.dumps(msg),
+            properties=pika.BasicProperties(
+                delivery_mode=2,
+            ),
+            mandatory=True
+        )
+    except Exception:
+        raise HTTPException(status_code=503, detail="Message broker unavailable")
 
 def get_llm_info(shortname):
-    # TODO
-    raise NotImplementedError # REMOVE THIS LINE WHEN IMPLEMENTED
-
+    try:
+        r = requests.get(f"{LLM_SERVICE_URL}/llm/{shortname}", timeout=5)
+        if r.status_code in (400, 404):
+            raise HTTPException(status_code=r.status_code, detail=r.json().get("detail"))
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM service unreachable: {e}") from e
 
 def deduct_user_credits(user_id, amount):
     try:

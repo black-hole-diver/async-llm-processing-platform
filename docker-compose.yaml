@@ -53,22 +53,21 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Uncomment on Task Three
-  # query-service:
-  #   restart: always
-  #   networks:
-  #     - rabbitmq-net
-  #   build: ./query_service
-  #   container_name: query-service
-  #   env_file: .env
-  #   volumes:
-  #     - query-data:/data
-  #   ports:
-  #     - "5003:5003"
-  #   depends_on:
-  #     - rabbitmq
-  #     - user-service
-  #     - llm-service
+  query-service:
+    restart: always
+    networks:
+      - rabbitmq-net
+    build: ./query_service
+    container_name: query-service
+    env_file: .env
+    volumes:
+      - query-data:/data
+    ports:
+      - "5003:5003"
+    depends_on:
+      - rabbitmq
+      - user-service
+      - llm-service
 
   # Uncomment on Task Four
   # worker-service:
